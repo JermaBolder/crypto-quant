@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import urllib.request
 
-QUESTDB_WRITE = "http://127.0.0.1:9000/write"
+from config import QUESTDB_HTTP
+
+QUESTDB_WRITE = f"{QUESTDB_HTTP}/write"
 TABLE = "trades"
 
 

@@ -18,6 +18,7 @@ import time
 import redis.asyncio as redis
 from redis.exceptions import ResponseError
 
+from config import REDIS_HOST, REDIS_PORT
 import qdb_sink
 
 STREAM = "trades"
@@ -38,7 +39,7 @@ async def ensure_group(r: redis.Redis) -> None:
 
 async def run(max_seconds: float | None = None, batch: int = 200,
               block_ms: int = 2000) -> None:
-    r = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True)
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
     await r.ping()
     await ensure_group(r)
     print(f"consumer: redis '{STREAM}' (group {GROUP}) -> QuestDB")

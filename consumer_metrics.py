@@ -23,6 +23,8 @@ from collections import deque
 import redis.asyncio as redis
 from redis.exceptions import ResponseError
 
+from config import REDIS_HOST, REDIS_PORT
+
 STREAM = "trades"
 GROUP = "cg_metrics"
 CONSUMER = "m1"
@@ -41,7 +43,7 @@ async def ensure_group(r: redis.Redis) -> None:
 
 
 async def run(max_seconds: float | None = None) -> None:
-    r = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True)
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
     await r.ping()
     await ensure_group(r)
     print(f"metrics: rolling {WINDOW_S:.0f}s order-flow delta on '{STREAM}'")

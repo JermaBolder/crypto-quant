@@ -1,0 +1,5 @@
+# Runtime deps for the LIVE pipeline only (producer / consumer).
+# The analysis tools (dataset/evaluate/model) use pandas + scikit-learn —
+# those are NOT needed in the production image, so they stay out of it.
+websockets==15.0.1
+redis==7.0.1

@@ -39,5 +39,32 @@ services:
       timeout: 3s
       retries: 5
 
+  # --- the app, containerized; both services share one built image ---
+  producer:
+    build: .
+    image: cq_app
+    container_name: cq_producer
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_HOST: redis            # resolve via the compose network, not localhost
+    command: ["python", "producer.py"]
+
+  consumer:
+    image: cq_app                  # reuses the image built by `producer` (no double-build)
+    container_name: cq_consumer
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      questdb:
+        condition: service_healthy
+    environment:
+      REDIS_HOST: redis
+      QUESTDB_HOST: questdb
+    command: ["python", "consumer_questdb.py"]
+
 volumes:
   qdb_data:

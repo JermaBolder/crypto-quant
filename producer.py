@@ -23,6 +23,7 @@ from dataclasses import asdict
 
 import redis.asyncio as redis
 
+from config import REDIS_HOST, REDIS_PORT
 from sources import BinanceTradeSource
 
 STREAM = "trades"
@@ -30,7 +31,7 @@ MAXLEN = 100_000  # cap stream length so Redis can't grow unbounded (OOM guard)
 
 
 async def run(symbol: str = "btcusdt", max_seconds: float | None = None) -> None:
-    r = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True)
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
     # fail fast if the bus isn't reachable, instead of silently dropping later
     await r.ping()
 

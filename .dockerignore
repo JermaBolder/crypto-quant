@@ -1,0 +1,8 @@
+# Keep the build context tiny: never ship the bundled JDK/QuestDB, the DB data,
+# the host venv, or git history into the Docker daemon.
+.venv/
+runtime/
+qdb-data/
+.git/
+__pycache__/
+*.pyc

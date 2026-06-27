@@ -1,0 +1,12 @@
+# Python environment — regenerate with:
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/
+__pycache__/
+*.pyc
+
+# Bundled runtimes (Temurin JDK + QuestDB) and DB data — large, regenerable
+runtime/
+qdb-data/
+
+# macOS
+.DS_Store

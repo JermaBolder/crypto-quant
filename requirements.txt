@@ -1,0 +1,6 @@
+# Phase 0 ingest. QuestDB is fed via ILP-over-HTTP using the standard library
+# (urllib), so the only third-party dependency is the websocket client.
+websockets==15.0.1
+
+# Phase 1: producer/consumer over a Redis Streams message bus.
+redis==7.0.1

@@ -1,0 +1,43 @@
+# Phase 5 — the data layer as supervised, reproducible containers.
+#
+# restart: unless-stopped  -> survives crashes AND host reboots (the exact
+# failure we hit twice, when QuestDB died with the terminal session).
+# For now the app (producer/consumer) keeps running on the HOST and talks to
+# these through the mapped ports; we containerize the app next.
+
+services:
+  questdb:
+    image: questdb/questdb:9.4.3
+    container_name: cq_questdb
+    restart: unless-stopped
+    ports:
+      - "9000:9000"        # HTTP: web console + ILP/HTTP ingest + /exec
+      - "8812:8812"        # Postgres wire
+      - "9009:9009"        # ILP over TCP
+    volumes:
+      - qdb_data:/var/lib/questdb        # verified data path inside the image
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/exec?query=select%201"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: cq_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    # Ephemeral bus: no RDB/AOF. The stream is transient; QuestDB is the durable
+    # store. On a Redis restart the stream + consumer groups reset — acceptable,
+    # the producer refills and consumers recreate their groups (at-least-once).
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  qdb_data:

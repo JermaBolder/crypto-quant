@@ -15,21 +15,29 @@ Usage:
   python backfill.py 2026-06-22 2026-06-23      # several days
   python backfill.py --days 3                    # last 3 available days
 
-NOT idempotent: re-running a day double-inserts it. Drop/recreate the table to
-redo cleanly. (We'll add proper dedup if we keep extending the backfill.)
+Idempotent PER DAY: a day that already has rows is skipped, so re-runs and
+overlapping ranges are safe. The unit of repair is the day: if a day ever gets
+half-ingested (crash mid-run), drop just that day's partition and re-run:
+  ALTER TABLE agg_trades DROP PARTITION LIST '2026-06-24';
+(QuestDB has no row-level DELETE; day partitions are the deletion unit.)
 """
 from __future__ import annotations
 
 import csv
 import io
+import json
 import sys
+import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import date, timedelta
 
+from config import QUESTDB_HTTP
+
 SYMBOL = "BTCUSDT"
 TABLE = "agg_trades"
-QUESTDB_WRITE = "http://127.0.0.1:9000/write"
+QUESTDB_WRITE = f"{QUESTDB_HTTP}/write"
 BASE = "https://data.binance.vision/data/spot/daily/aggTrades"
 BATCH = 10_000
 
@@ -40,7 +48,29 @@ def _post(lines: list[str]) -> None:
     urllib.request.urlopen(req, timeout=30)  # raises on non-2xx
 
 
+def day_row_count(d: date) -> int:
+    """Rows already stored for day d. 0 also when the table doesn't exist yet
+    (first ever run — ILP auto-creates it on write). A QuestDB that is DOWN is
+    a different story: fail loudly instead of 'skipping nothing' silently.
+    """
+    # WHERE timestamp IN '2026-06-24' is QuestDB's whole-day interval syntax.
+    q = f"select count() from {TABLE} where timestamp in '{d.isoformat()}'"
+    url = f"{QUESTDB_HTTP}/exec?query={urllib.parse.quote(q)}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            return int(json.loads(resp.read())["dataset"][0][0])
+    except urllib.error.HTTPError:
+        return 0  # 400 = table does not exist yet
+    except urllib.error.URLError as e:
+        raise SystemExit(f"QuestDB unreachable at {QUESTDB_HTTP}: {e}") from e
+
+
 def ingest_day(d: date) -> int:
+    have = day_row_count(d)
+    if have > 0:
+        print(f"  {d}: already have {have:,} rows — skip")
+        return 0
+
     url = f"{BASE}/{SYMBOL}/{SYMBOL}-aggTrades-{d.isoformat()}.zip"
     print(f"  {d}: downloading ...", flush=True)
     try:

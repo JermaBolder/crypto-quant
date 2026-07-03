@@ -1,11 +1,14 @@
 # crypto-quant — modern-stack learning build
 
+[![CI](https://github.com/JermaBolder/crypto-quant/actions/workflows/ci.yml/badge.svg)](https://github.com/JermaBolder/crypto-quant/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Goal: learn the modern data/quant stack by building a real one. Money was
 explicitly secondary; the honest research verdict below is part of the point.
 
 ![order-flow terminal](docs/dashboard.png)
 
-Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓**
+Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓ · tests+CI ✓**
 
 ## Architecture
 ```
@@ -57,6 +60,8 @@ the boundary — it exposes three narrow read-only questions (/health /bars /sta
 | `api.py` | FastAPI over QuestDB: /health (data freshness) /bars /stats. |
 | `dashboard/` | Next.js order-flow terminal: candles + delta, flow-balance tape, live badge. |
 | `docker-compose.yml`, `Dockerfile` | the whole pipeline as supervised containers. |
+| `tests/` | pytest units: ILP wire format, ms/µs parsers, dead-zone labels, purged splits, API. |
+| `.github/workflows/ci.yml` | CI: ruff + pytest; eslint + next build. |
 | `legacy/ingest.py`, `run_questdb.sh`, `runtime/` | retired pre-Docker path (kept for history). |
 
 ## Run
@@ -79,6 +84,11 @@ curl -sG http://localhost:9000/exec --data-urlencode \
 # dashboard (two terminals)
 .venv/bin/uvicorn api:app --port 8000    # API over QuestDB
 cd dashboard && npm run dev              # UI → http://localhost:3000
+
+# tests + lint (same as CI)
+pip install -r requirements-dev.txt
+.venv/bin/ruff check .
+.venv/bin/pytest
 ```
 
 ## Stack notes (macOS arm64)

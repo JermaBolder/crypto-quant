@@ -18,8 +18,8 @@ import time
 import redis.asyncio as redis
 from redis.exceptions import ResponseError
 
-from config import REDIS_HOST, REDIS_PORT
 import qdb_sink
+from config import REDIS_HOST, REDIS_PORT
 
 STREAM = "trades"
 GROUP = "cg_questdb"

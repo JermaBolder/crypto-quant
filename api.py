@@ -26,7 +26,7 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,7 +62,7 @@ def health() -> dict:
     if not rows:
         return {"ok": False, "latest_trade": None, "age_s": None}
     latest = rows[0][0]
-    age = (datetime.now(timezone.utc)
+    age = (datetime.now(UTC)
            - datetime.fromisoformat(latest.replace("Z", "+00:00"))).total_seconds()
     # >60s of silence on BTCUSDT (which prints many times a second) = stalled
     return {"ok": age < 60, "latest_trade": latest, "age_s": round(age, 1)}

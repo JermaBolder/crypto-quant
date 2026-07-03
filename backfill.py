@@ -65,6 +65,17 @@ def day_row_count(d: date) -> int:
         raise SystemExit(f"QuestDB unreachable at {QUESTDB_HTTP}: {e}") from e
 
 
+def row_to_line(row: list[str]) -> str:
+    """One dump CSV row -> ILP line. transactTime is MICROseconds -> *1000 = ns."""
+    # aggId, price, qty, firstId, lastId, transactTime(us), isBuyerMaker, ...
+    side = "SELL" if row[6].lower() == "true" else "BUY"
+    ts_ns = int(row[5]) * 1000
+    return (
+        f"{TABLE},symbol={SYMBOL},side={side} "
+        f"price={float(row[1]):.8f},size={float(row[2]):.8f},agg_id={row[0]}i {ts_ns}"
+    )
+
+
 def ingest_day(d: date) -> int:
     have = day_row_count(d)
     if have > 0:
@@ -84,13 +95,7 @@ def ingest_day(d: date) -> int:
     buf: list[str] = []
     with zf.open(zf.namelist()[0]) as fh:
         for row in csv.reader(io.TextIOWrapper(fh, encoding="utf-8")):
-            # aggId, price, qty, firstId, lastId, transactTime(us), isBuyerMaker, ...
-            side = "SELL" if row[6].lower() == "true" else "BUY"
-            ts_ns = int(row[5]) * 1000          # microseconds -> nanoseconds
-            buf.append(
-                f"{TABLE},symbol={SYMBOL},side={side} "
-                f"price={float(row[1]):.8f},size={float(row[2]):.8f},agg_id={row[0]}i {ts_ns}"
-            )
+            buf.append(row_to_line(row))
             if len(buf) >= BATCH:
                 _post(buf)
                 n += len(buf)

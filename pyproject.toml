@@ -1,0 +1,18 @@
+# Tool config only — this repo is flat scripts, not an installable package,
+# so no [project]/[build-system]. Dev deps live in requirements-dev.txt.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["legacy"]        # retired pre-Docker path, kept for history
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "BLE"]
+ignore = ["E741"]                  # c/h/l is OHLC vocabulary, not ambiguity
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Query"]   # Query() in a default is the FastAPI idiom
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]                 # flat module layout: tests import root modules

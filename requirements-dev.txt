@@ -1,0 +1,9 @@
+# Dev/CI only: lint + tests, plus the research deps (pandas/sklearn) that the
+# tests import but the runtime image deliberately excludes.
+-r requirements.txt
+pandas==3.0.3
+numpy==2.5.0
+scikit-learn==1.9.0
+pytest==9.1.1
+httpx2==2.5.0        # fastapi TestClient transport (plain httpx is deprecated there)
+ruff==0.15.20

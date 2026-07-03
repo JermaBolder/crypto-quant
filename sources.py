@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 import json
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import AsyncIterator
 
 import websockets
 
@@ -33,6 +33,18 @@ class TradeSource(ABC):
         ...
 
 
+def parse_trade(msg: dict) -> Trade:
+    """One Binance @trade payload -> normalized Trade (T is ms; m = buyer-is-maker)."""
+    return Trade(
+        ts_ns=int(msg["T"]) * 1_000_000,     # ms -> ns
+        symbol=msg["s"],
+        price=float(msg["p"]),
+        size=float(msg["q"]),
+        side="SELL" if msg["m"] else "BUY",  # aggressor
+        trade_id=int(msg["t"]),
+    )
+
+
 class BinanceTradeSource(TradeSource):
     def __init__(self, symbol: str = "btcusdt") -> None:
         self.symbol = symbol.lower()
@@ -44,15 +56,7 @@ class BinanceTradeSource(TradeSource):
             try:
                 async with websockets.connect(self.url, ping_interval=20) as ws:
                     async for raw in ws:
-                        t = json.loads(raw)
-                        yield Trade(
-                            ts_ns=int(t["T"]) * 1_000_000,     # ms -> ns
-                            symbol=t["s"],
-                            price=float(t["p"]),
-                            size=float(t["q"]),
-                            side="SELL" if t["m"] else "BUY",  # aggressor
-                            trade_id=int(t["t"]),
-                        )
+                        yield parse_trade(json.loads(raw))
             except Exception as e:  # noqa: BLE001
                 print(f"[source] reconnecting after error: {e}")
                 await asyncio.sleep(2)

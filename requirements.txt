@@ -4,3 +4,7 @@ websockets==15.0.1
 
 # Phase 1: producer/consumer over a Redis Streams message bus.
 redis==7.0.1
+
+# Phase 3: dashboard API (host-only; NOT in the container image).
+fastapi==0.139.0
+uvicorn==0.49.0

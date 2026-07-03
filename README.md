@@ -3,6 +3,8 @@
 Goal: learn the modern data/quant stack by building a real one. Money was
 explicitly secondary; the honest research verdict below is part of the point.
 
+![order-flow terminal](docs/dashboard.png)
+
 Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓**
 
 ## Architecture

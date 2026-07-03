@@ -8,7 +8,7 @@ explicitly secondary; the honest research verdict below is part of the point.
 
 ![order-flow terminal](docs/dashboard.png)
 
-Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓ · tests+CI ✓**
+Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓ · tests+CI ✓ · 6 carry ✓ (harvest yes, timing no)**
 
 ## Architecture
 ```
@@ -44,6 +44,26 @@ the boundary — it exposes three narrow read-only questions (/health /bars /sta
 - Stop rule agreed in advance: net ≤ 0 ⇒ iteration closed, no further tuning.
   Weak public-data signals on 1m BTC do not survive costs. Verified, twice.
 
+## Carry study (funding/basis, USDT-M perp): HARVEST YES, TIMING NO
+- **Mechanism**: every 8h the perp transfers funding between longs and shorts;
+  short perp + long spot collects it delta-neutrally while the premium index
+  marks against the short leg. Costs are charged on **turnover** (14 bps per
+  leg change, 28 round trip), not per interval — the structural reason carry
+  can survive the fees that killed the 1m ML signal.
+- **Data**: 2020-01 … 2026-06, 7,089 8h intervals (funding + premium-index
+  klines). Funding: mean +1.09 bps/8h, median +0.96 (≈ the 1 bp default rate),
+  85.6% positive, autocorr(1) 0.80.
+- **Always-on harvest**: net **+1.09 bps/8h ≈ +11.9%/yr** after full retail
+  costs — one round trip in 6.5 years, turnover ≈ 0.
+- **Timing rules** (θ on funding level / 3-interval mean, θ picked inside train
+  folds, purged walk-forward, OOS-only): best nets +0.31 bps/8h vs always-on's
+  +0.92 **on the same OOS rows**. The "obvious" hold-when-f>0 filter *loses*
+  −0.83 bps/8h held: 481 entries × 28 bps eat far more than the negative
+  intervals they avoid. Every filter pays more in fees than it saves.
+- Stop rule agreed in advance: rule ≤ always-on OOS ⇒ chapter closed. **The
+  carry exists; timing it doesn't.** Caveat: signal-quality proxy, not a
+  backtest — margin, liquidation risk on the short leg, drawdowns ignored.
+
 ## Files
 | file | what |
 |---|---|
@@ -57,10 +77,13 @@ the boundary — it exposes three narrow read-only questions (/health /bars /sta
 | `dataset.py` | 1m order-flow bars → 22 features + vol-scaled dead-zone label. |
 | `evaluate.py` | baselines-in-money harness + purged walk-forward splits. |
 | `model.py` | logreg + HistGradientBoosting, abstain-τ inside train, stop-rule verdict. |
+| `backfill_futures.py` | funding + premium-index dumps → QuestDB; idempotent per month. |
+| `carry.py` | 8h carry dataset: funding + basis MTM, fail-loud grid snap. |
+| `carry_eval.py` | episode-costed baselines + θ-rules OOS, stop-rule verdict. |
 | `api.py` | FastAPI over QuestDB: /health (data freshness) /bars /stats. |
 | `dashboard/` | Next.js order-flow terminal: candles + delta, flow-balance tape, live badge. |
 | `docker-compose.yml`, `Dockerfile` | the whole pipeline as supervised containers. |
-| `tests/` | pytest units: ILP wire format, ms/µs parsers, dead-zone labels, purged splits, API. |
+| `tests/` | pytest units: ILP wire format, ms/µs parsers, dead-zone labels, purged splits, carry math, API. |
 | `.github/workflows/ci.yml` | CI: ruff + pytest; eslint + next build. |
 | `legacy/ingest.py`, `run_questdb.sh`, `runtime/` | retired pre-Docker path (kept for history). |
 
@@ -81,6 +104,11 @@ curl -sG http://localhost:9000/exec --data-urlencode \
 .venv/bin/python evaluate.py             # baselines (the bar to clear)
 .venv/bin/python model.py                # models + verdict
 
+# carry study (funding/basis)
+.venv/bin/python backfill_futures.py 2020-01:2026-06  # idempotent per MONTH
+.venv/bin/python carry.py                # 8h dataset + descriptive stats
+.venv/bin/python carry_eval.py           # episode-costed baselines + verdict
+
 # dashboard (two terminals)
 .venv/bin/uvicorn api:app --port 8000    # API over QuestDB
 cd dashboard && npm run dev              # UI → http://localhost:3000
@@ -95,8 +123,14 @@ pip install -r requirements-dev.txt
 - Docker via colima (no Docker Desktop); `brew services start colima` = autostart.
 - QuestDB data lives in the `qdb_data` volume — survives container restarts.
 - Binance dump gotcha: `transactTime` is **microseconds** (WS gives ms) → ×1000 = ns.
+- Futures monthly dumps HAVE a header row (spot daily do not) and stamp in
+  **ms with jitter** (`…00005`) — parsers sniff the header; `carry.py` snaps to
+  the 8h grid with a 5-min fail-loud tolerance.
 - QuestDB has no row DELETE; the repair unit is the day partition
   (`ALTER TABLE agg_trades DROP PARTITION LIST '2026-06-24';`).
+- Carry tables are the repo's first explicit DDL (`PARTITION BY MONTH` — ILP
+  auto-create would make ~2,400 three-row DAY partitions for funding); their
+  repair unit is the month: `ALTER TABLE funding DROP PARTITION LIST '2024-03';`.
 
 ## If ever continued
 The honest financial path is not more crypto tuning but pointing this harness

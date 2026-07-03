@@ -3,7 +3,7 @@
 Goal: learn the modern data/quant stack by building a real one. Money was
 explicitly secondary; the honest research verdict below is part of the point.
 
-Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge)**
+Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓**
 
 ## Architecture
 ```
@@ -19,6 +19,13 @@ Research path (offline, on the host):
 ```
 data.binance.vision ──backfill──▶ agg_trades ──dataset──▶ features+label ──model──▶ verdict
 ```
+
+Dashboard path (host):
+```
+QuestDB ──api.py (FastAPI :8000)──▶ dashboard/ (Next.js :3000, polls every 3s)
+```
+The browser never talks to the DB: /exec accepts arbitrary SQL, so the API is
+the boundary — it exposes three narrow read-only questions (/health /bars /stats).
 
 ## Research verdict (v1 + v2): NO EDGE — and that's the result
 - **v1** (14 days, 9 features, logreg): OOS hit 48.3%, net −16.3 bps/bet.
@@ -45,6 +52,8 @@ data.binance.vision ──backfill──▶ agg_trades ──dataset──▶ fe
 | `dataset.py` | 1m order-flow bars → 22 features + vol-scaled dead-zone label. |
 | `evaluate.py` | baselines-in-money harness + purged walk-forward splits. |
 | `model.py` | logreg + HistGradientBoosting, abstain-τ inside train, stop-rule verdict. |
+| `api.py` | FastAPI over QuestDB: /health (data freshness) /bars /stats. |
+| `dashboard/` | Next.js order-flow terminal: candles + delta, flow-balance tape, live badge. |
 | `docker-compose.yml`, `Dockerfile` | the whole pipeline as supervised containers. |
 | `legacy/ingest.py`, `run_questdb.sh`, `runtime/` | retired pre-Docker path (kept for history). |
 
@@ -64,6 +73,10 @@ curl -sG http://localhost:9000/exec --data-urlencode \
 .venv/bin/python dataset.py              # class-balance sweep across horizons
 .venv/bin/python evaluate.py             # baselines (the bar to clear)
 .venv/bin/python model.py                # models + verdict
+
+# dashboard (two terminals)
+.venv/bin/uvicorn api:app --port 8000    # API over QuestDB
+cd dashboard && npm run dev              # UI → http://localhost:3000
 ```
 
 ## Stack notes (macOS arm64)
@@ -74,6 +87,6 @@ curl -sG http://localhost:9000/exec --data-urlencode \
   (`ALTER TABLE agg_trades DROP PARTITION LIST '2026-06-24';`).
 
 ## If ever continued
-Phase 3 (dashboard) stayed optional. The honest financial path is not more
-crypto tuning but pointing this harness at a market with an actual
-information advantage — or accepting the system as what it is: infrastructure.
+The honest financial path is not more crypto tuning but pointing this harness
+at a market with an actual information advantage — or accepting the system as
+what it is: infrastructure with a face.

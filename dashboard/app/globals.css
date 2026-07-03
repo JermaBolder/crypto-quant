@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* Design tokens. Cold graphite-blue terminal with a TWO-SIDED accent system:
+   order flow is buy vs sell, so the page gets two accents (teal / coral),
+   not one. Amber exists only to flag stale data. */
+@theme {
+  --color-bg: #0c1017;
+  --color-panel: #131926;
+  --color-line: #202a3c;
+  --color-grid: #181f2e;
+  --color-ink: #dce3f0;
+  --color-dim: #7c8aa5;
+  --color-buy: #33c6a4;
+  --color-sell: #e4685f;
+  --color-warn: #d9a44a;
+
+  --font-mono: var(--font-jbmono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-buy) 35%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-buy);
+  outline-offset: 2px;
+}
+
+/* the live-dot heartbeat is the page's only animation */
+@keyframes heartbeat {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.live-dot {
+  animation: heartbeat 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}

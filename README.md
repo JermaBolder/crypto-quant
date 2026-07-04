@@ -5,6 +5,8 @@
 
 Goal: learn the modern data/quant stack by building a real one. Money was
 explicitly secondary; the honest research verdict below is part of the point.
+The full research story — method, numbers, and why the negative results are
+the finding — is written up in [docs/research.md](docs/research.md).
 
 ![order-flow terminal](docs/dashboard.png)
 
@@ -85,6 +87,7 @@ the boundary — it exposes three narrow read-only questions (/health /bars /sta
 | `docker-compose.yml`, `Dockerfile` | the whole pipeline as supervised containers. |
 | `tests/` | pytest units: ILP wire format, ms/µs parsers, dead-zone labels, purged splits, carry math, API. |
 | `.github/workflows/ci.yml` | CI: ruff + pytest; eslint + next build. |
+| `docs/research.md` | the two research chapters as one story: method, numbers, stop rules. |
 | `legacy/ingest.py`, `run_questdb.sh`, `runtime/` | retired pre-Docker path (kept for history). |
 
 ## Run

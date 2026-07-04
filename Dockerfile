@@ -13,7 +13,7 @@ COPY requirements-app.txt .
 RUN pip install --no-cache-dir -r requirements-app.txt
 
 # only the modules the runtime actually imports
-COPY config.py sources.py qdb_sink.py producer.py consumer_questdb.py consumer_metrics.py ./
+COPY config.py sources.py qdb_sink.py producer.py consumer_questdb.py consumer_metrics.py watchdog.py ./
 
 # default; each compose service overrides this
 CMD ["python", "producer.py"]

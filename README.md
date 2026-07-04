@@ -8,17 +8,22 @@ explicitly secondary; the honest research verdict below is part of the point.
 
 ![order-flow terminal](docs/dashboard.png)
 
-Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓ · tests+CI ✓ · 6 carry ✓ (harvest yes, timing no)**
+Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓ · tests+CI ✓ · 6 carry ✓ (harvest yes, timing no) · 7 ops watchdog ✓**
 
 ## Architecture
 ```
 Binance WS ──producer──▶ Redis Stream "trades" ──consumer(group)──▶ QuestDB
    (cq_producer)             (cq_redis)            (cq_consumer)    (cq_questdb)
+                                                                        │
+                                              (cq_watchdog) watchdog ◀──┘──▶ Telegram
 ```
-All four run as Docker containers (`restart: unless-stopped`, healthchecks,
+All five run as Docker containers (`restart: unless-stopped`, healthchecks,
 data in the `qdb_data` volume). Producer and consumer are decoupled in time:
 either can crash, restart, or lag without taking the other down. The consumer
 ACKs an entry only *after* the DB write succeeds (at-least-once delivery).
+The watchdog watches the honest health metric — latest trade age, end-to-end —
+and pushes a Telegram alert on state changes (stalled / DB down / recovered),
+with hysteresis (alert ≥120s, recover <60s) so it never flaps.
 
 Research path (offline, on the host):
 ```
@@ -80,6 +85,7 @@ the boundary — it exposes three narrow read-only questions (/health /bars /sta
 | `backfill_futures.py` | funding + premium-index dumps → QuestDB; idempotent per month. |
 | `carry.py` | 8h carry dataset: funding + basis MTM, fail-loud grid snap. |
 | `carry_eval.py` | episode-costed baselines + θ-rules OOS, stop-rule verdict. |
+| `watchdog.py` | freshness watchdog → Telegram; hysteresis state machine, log-only w/o secrets. |
 | `api.py` | FastAPI over QuestDB: /health (data freshness) /bars /stats. |
 | `dashboard/` | Next.js order-flow terminal: candles + delta, flow-balance tape, live badge. |
 | `docker-compose.yml`, `Dockerfile` | the whole pipeline as supervised containers. |
@@ -91,8 +97,13 @@ the boundary — it exposes three narrow read-only questions (/health /bars /sta
 ```bash
 # Docker runtime (colima autostarts at login via brew services)
 colima start                    # only needed manually if the service is off
-docker compose up -d            # builds cq_app, starts all four containers
-docker compose logs -f producer consumer
+docker compose up -d            # builds cq_app, starts all five containers
+docker compose logs -f producer consumer watchdog
+
+# alerts (optional): create a bot via @BotFather, then put into .env (untracked):
+#   TG_BOT_TOKEN=123456:ABC...
+#   TG_CHAT_ID=123456789
+# compose auto-loads .env; empty/missing = watchdog runs log-only
 
 # inspect the data
 curl -sG http://localhost:9000/exec --data-urlencode \
@@ -131,6 +142,8 @@ pip install -r requirements-dev.txt
 - Carry tables are the repo's first explicit DDL (`PARTITION BY MONTH` — ILP
   auto-create would make ~2,400 three-row DAY partitions for funding); their
   repair unit is the month: `ALTER TABLE funding DROP PARTITION LIST '2024-03';`.
+- Secrets never enter git or the image: `.env` is gitignored AND dockerignored;
+  compose interpolates `${TG_BOT_TOKEN:-}` into the watchdog's environment.
 
 ## If ever continued
 The honest financial path is not more crypto tuning but pointing this harness

@@ -10,5 +10,8 @@ __pycache__/
 runtime/
 qdb-data/
 
+# Secrets (compose auto-loads .env; TG_BOT_TOKEN / TG_CHAT_ID live there)
+.env
+
 # macOS
 .DS_Store

@@ -66,5 +66,19 @@ services:
       QUESTDB_HOST: questdb
     command: ["python", "consumer_questdb.py"]
 
+  watchdog:
+    image: cq_app                  # same shared image, different command
+    container_name: cq_watchdog
+    restart: unless-stopped
+    depends_on:
+      questdb:
+        condition: service_healthy
+    environment:
+      QUESTDB_HOST: questdb
+      # secrets come from the untracked .env (compose auto-loads it); empty = log-only
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      TG_CHAT_ID: ${TG_CHAT_ID:-}
+    command: ["python", "watchdog.py"]
+
 volumes:
   qdb_data:

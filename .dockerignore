@@ -4,5 +4,11 @@
 runtime/
 qdb-data/
 .git/
+.claude/
 __pycache__/
 *.pyc
+dashboard/node_modules/
+dashboard/.next/
+.pytest_cache/
+.ruff_cache/
+.env

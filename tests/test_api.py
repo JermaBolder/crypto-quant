@@ -105,3 +105,53 @@ def test_stats_handles_empty_hour(monkeypatch):
         "delta_1h": 0.0,
         "trades_per_min": 0.0,
     }
+
+
+# --- /funding ---
+
+def fake_q_funding(sql: str) -> list[list]:
+    if "FROM funding" in sql:
+        return [
+            ["2026-06-30T00:00:00.000000Z", 0.0001],
+            ["2026-06-30T08:00:00.000000Z", -0.0002],
+            ["2026-06-30T16:00:00.000000Z", 0.0003],
+            ["2026-07-01T00:00:00.000000Z", 0.0004],
+        ]
+    return [[0.0005]]                                  # premium_index_1h latest o (basis)
+
+
+def test_funding_stats_and_series(monkeypatch):
+    monkeypatch.setattr(api, "q", fake_q_funding)
+    body = client.get("/funding").json()
+    # mean rate = (1 - 2 + 3 + 4)/4 bps = 1.5 bps; annualized = 0.00015*1095*100
+    # = 16.425, which rounds to 16.42 (float repr of x.425 lands just below)
+    assert body == {
+        "latest_rate_bps": 4.0,
+        "latest_ts": "2026-07-01T00:00:00.000000Z",
+        "mean_rate_bps": 1.5,
+        "pct_positive": 0.75,
+        "annualized_pct": 16.42,
+        "latest_basis_bps": 5.0,
+        "series": [
+            {"t": "2026-06-30T00:00:00.000000Z", "rate_bps": 1.0},
+            {"t": "2026-06-30T08:00:00.000000Z", "rate_bps": -2.0},
+            {"t": "2026-06-30T16:00:00.000000Z", "rate_bps": 3.0},
+            {"t": "2026-07-01T00:00:00.000000Z", "rate_bps": 4.0},
+        ],
+    }
+
+
+def test_funding_intervals_bounds(monkeypatch):
+    monkeypatch.setattr(api, "q", fake_q_funding)
+    assert client.get("/funding", params={"intervals": 0}).status_code == 422
+    assert client.get("/funding", params={"intervals": 1001}).status_code == 422
+    assert client.get("/funding", params={"intervals": 1000}).status_code == 200
+
+
+def test_funding_empty_table(monkeypatch):
+    monkeypatch.setattr(api, "q", lambda sql: [])
+    assert client.get("/funding").json() == {
+        "latest_rate_bps": None, "latest_ts": None, "mean_rate_bps": None,
+        "pct_positive": None, "annualized_pct": None,
+        "latest_basis_bps": None, "series": [],
+    }

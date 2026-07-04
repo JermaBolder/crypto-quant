@@ -106,3 +106,37 @@ def stats() -> dict:
         "delta_1h": round(delta, 4) if delta is not None else 0.0,
         "trades_per_min": round((rate[0][0] if rate else 0) / 5.0, 1),
     }
+
+
+# 8h funding intervals in a year: annualizes the always-on harvest exactly as
+# carry.py does (simple, non-compounded), so the panel number matches the study.
+FUNDING_PER_YEAR = 3 * 365
+
+
+@app.get("/funding")
+def funding(intervals: int = Query(default=90, ge=1, le=1000)) -> dict:
+    """Recent funding-rate history + carry context for the dashboard panel.
+
+    Reads the OFFLINE carry backfill (funding + premium_index_1h), not the live
+    stream — so this is "the funding regime lately", the visual companion to the
+    carry study. `intervals` = how many 8h events to summarize (default 90 ≈ 30d).
+    Rates are returned in bps (fraction × 1e4)."""
+    rows = q(f"SELECT timestamp, rate FROM funding LIMIT -{intervals}")
+    basis = q("SELECT o FROM premium_index_1h LIMIT -1")
+    if not rows:
+        return {"latest_rate_bps": None, "latest_ts": None, "mean_rate_bps": None,
+                "pct_positive": None, "annualized_pct": None,
+                "latest_basis_bps": None, "series": []}
+    rates = [r[1] for r in rows]
+    n = len(rates)
+    mean = sum(rates) / n
+    basis_bps = round(basis[0][0] * 1e4, 3) if basis and basis[0][0] is not None else None
+    return {
+        "latest_rate_bps": round(rates[-1] * 1e4, 3),
+        "latest_ts": rows[-1][0],
+        "mean_rate_bps": round(mean * 1e4, 3),
+        "pct_positive": round(sum(1 for x in rates if x > 0) / n, 4),
+        "annualized_pct": round(mean * FUNDING_PER_YEAR * 100, 2),   # always-on gross proxy
+        "latest_basis_bps": basis_bps,
+        "series": [{"t": r[0], "rate_bps": round(r[1] * 1e4, 3)} for r in rows],
+    }

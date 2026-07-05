@@ -23,6 +23,18 @@ export type Health = {
   age_s: number | null; // seconds since the last trade hit the DB
 };
 
+// Recent funding-rate history + carry context (from the offline carry backfill,
+// not the live stream). Rates are in bps (fraction × 1e4).
+export type Funding = {
+  latest_rate_bps: number | null;
+  latest_ts: string | null;
+  mean_rate_bps: number | null;   // over the returned window
+  pct_positive: number | null;    // 0..1, share of intervals with positive funding
+  annualized_pct: number | null;  // always-on harvest gross, %/yr
+  latest_basis_bps: number | null; // perp premium over spot index
+  series: { t: string; rate_bps: number }[]; // ascending by time
+};
+
 export async function getJSON<T>(path: string): Promise<T> {
   const r = await fetch(`${API}${path}`, { cache: "no-store" });
   if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { getJSON, type Bar, type Health, type Stats } from "@/lib/api";
+import { getJSON, type Bar, type Funding, type Health, type Stats } from "@/lib/api";
 
 // lightweight-charts is canvas + window; it has no meaning on the server.
 // Dynamic import keeps it out of the SSR pass and out of the shell bundle.
@@ -66,6 +66,82 @@ function FlowTape({ buyShare }: { buyShare: number | null }) {
   );
 }
 
+// Funding as a bar sparkline: one thin bar per 8h interval, teal up / coral
+// down from a zero baseline — the same sign language as the delta histogram.
+// You SEE the carry finding here: mostly teal (funding usually pays the short),
+// with the occasional coral dip. No canvas; pure SVG, so no autoSize race.
+function FundingSpark({ series }: { series: Funding["series"] }) {
+  if (series.length === 0) {
+    return <div className="h-10 text-xs text-dim">no funding data — run backfill_futures.py</div>;
+  }
+  const rates = series.map((p) => p.rate_bps);
+  const maxAbs = Math.max(1e-9, ...rates.map(Math.abs));
+  const n = series.length;
+  const bw = 0.72; // bar width in viewBox units (gap between bars = 1 - bw)
+  return (
+    <svg viewBox={`0 0 ${n} 40`} preserveAspectRatio="none" className="h-10 w-full">
+      <line x1="0" y1="20" x2={n} y2="20" stroke="var(--color-line)" strokeWidth="0.5" />
+      {series.map((p, i) => {
+        const h = (Math.abs(p.rate_bps) / maxAbs) * 18;
+        const up = p.rate_bps >= 0;
+        return (
+          <rect
+            key={p.t}
+            x={i + (1 - bw) / 2}
+            y={up ? 20 - h : 20}
+            width={bw}
+            height={h}
+            className={up ? "fill-buy/80" : "fill-sell/80"}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+// The visual companion to the carry study (docs/research.md): funding usually
+// pays the delta-neutral short, ~1 bp/8h, which annualizes into the harvest.
+function FundingPanel({ funding }: { funding: Funding | null }) {
+  const tone = (x: number | null | undefined) =>
+    x == null ? undefined : x >= 0 ? "buy" : "sell";
+  const bps = (x: number | null | undefined, d = 2) =>
+    x == null ? "—" : fmtSigned(x, d);
+  return (
+    <section className="rounded-[3px] border border-line bg-panel/40 p-3">
+      <div className="mb-3 flex items-baseline justify-between">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-dim">
+          funding / basis · carry context · last 30d
+        </span>
+        <span className="font-mono text-xs text-dim">USDT-M perp · 8h</span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+        <StatCell
+          label="funding now"
+          value={funding ? `${bps(funding.latest_rate_bps)} bps` : "—"}
+          tone={tone(funding?.latest_rate_bps)}
+        />
+        <StatCell
+          label="30d mean"
+          value={funding ? `${bps(funding.mean_rate_bps)} bps` : "—"}
+          tone={tone(funding?.mean_rate_bps)}
+        />
+        <StatCell
+          label="% positive"
+          value={funding?.pct_positive != null ? `${Math.round(funding.pct_positive * 100)}%` : "—"}
+        />
+        <StatCell
+          label="annualized"
+          value={funding?.annualized_pct != null ? `${bps(funding.annualized_pct, 1)}%/yr` : "—"}
+          tone={tone(funding?.annualized_pct)}
+        />
+      </div>
+      <div className="mt-3">
+        <FundingSpark series={funding?.series ?? []} />
+      </div>
+    </section>
+  );
+}
+
 function Freshness({ health }: { health: Health | null }) {
   if (!health || health.age_s == null) {
     return <span className="text-xs text-dim">no data yet</span>;
@@ -89,6 +165,7 @@ export default function Terminal() {
   const [bars, setBars] = useState<Bar[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
+  const [funding, setFunding] = useState<Funding | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,6 +185,14 @@ export default function Terminal() {
         setErr(null);
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : String(e));
+      }
+      // funding is historical context, not the live stream: fetch it separately
+      // so a missing backfill (or its 503) never blanks the live pipeline view.
+      try {
+        const f = await getJSON<Funding>("/funding?intervals=90");
+        if (alive) setFunding(f);
+      } catch {
+        if (alive) setFunding(null);
       }
     }
     tick();
@@ -171,6 +256,8 @@ export default function Terminal() {
           </div>
         )}
       </section>
+
+      <FundingPanel funding={funding} />
 
       <footer className="flex justify-between text-[11px] text-dim">
         <span>times local · candles 1m · Δ = buy − sell volume (aggressor side) · gaps = pipeline downtime</span>

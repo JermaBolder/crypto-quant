@@ -37,7 +37,9 @@ Dashboard path (host):
 QuestDB ──api.py (FastAPI :8000)──▶ dashboard/ (Next.js :3000, polls every 3s)
 ```
 The browser never talks to the DB: /exec accepts arbitrary SQL, so the API is
-the boundary — it exposes three narrow read-only questions (/health /bars /stats).
+the boundary — it exposes four narrow read-only questions (/health /bars /stats
+/funding). The funding panel visualizes the carry study's data right in the
+terminal: recent 8h funding as a teal(+)/coral(−) bar sparkline + carry stats.
 
 ## Research verdict (v1 + v2): NO EDGE — and that's the result
 - **v1** (14 days, 9 features, logreg): OOS hit 48.3%, net −16.3 bps/bet.
@@ -88,8 +90,8 @@ the boundary — it exposes three narrow read-only questions (/health /bars /sta
 | `carry.py` | 8h carry dataset: funding + basis MTM, fail-loud grid snap. |
 | `carry_eval.py` | episode-costed baselines + θ-rules OOS, stop-rule verdict. |
 | `watchdog.py` | freshness watchdog → Telegram; hysteresis state machine, log-only w/o secrets. |
-| `api.py` | FastAPI over QuestDB: /health (data freshness) /bars /stats. |
-| `dashboard/` | Next.js order-flow terminal: candles + delta, flow-balance tape, live badge. |
+| `api.py` | FastAPI over QuestDB: /health (freshness) /bars /stats /funding (carry). |
+| `dashboard/` | Next.js order-flow terminal: candles + delta, flow tape, live badge, funding panel. |
 | `docker-compose.yml`, `Dockerfile` | the whole pipeline as supervised containers. |
 | `tests/` | pytest units: ILP wire format, ms/µs parsers, dead-zone labels, purged splits, carry math, API. |
 | `.github/workflows/ci.yml` | CI: ruff + pytest; eslint + next build. |

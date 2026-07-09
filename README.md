@@ -89,6 +89,7 @@ terminal: recent 8h funding as a teal(+)/coral(−) bar sparkline + carry stats.
 | `backfill_futures.py` | funding + premium-index dumps → QuestDB; idempotent per month. |
 | `carry.py` | 8h carry dataset: funding + basis MTM, fail-loud grid snap. |
 | `carry_eval.py` | episode-costed baselines + θ-rules OOS, stop-rule verdict. |
+| `backfill_ethena.py` | sUSDe realized yield (DefiLlama, free API) → QuestDB; complete days only. |
 | `watchdog.py` | freshness watchdog → Telegram; hysteresis state machine, log-only w/o secrets. |
 | `api.py` | FastAPI over QuestDB: /health (freshness) /bars /stats /funding (carry). |
 | `dashboard/` | Next.js order-flow terminal: candles + delta, flow tape, live badge, funding panel. |
@@ -124,6 +125,7 @@ curl -sG http://localhost:9000/exec --data-urlencode \
 .venv/bin/python backfill_futures.py 2020-01:2026-06  # idempotent per MONTH
 .venv/bin/python carry.py                # 8h dataset + descriptive stats
 .venv/bin/python carry_eval.py           # episode-costed baselines + verdict
+.venv/bin/python backfill_ethena.py      # sUSDe yield history (next-chapter data)
 
 # dashboard (two terminals)
 .venv/bin/uvicorn api:app --port 8000    # API over QuestDB

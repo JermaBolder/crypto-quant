@@ -1,16 +1,19 @@
-# The research story: two chapters, two honest verdicts
+# The research story: three chapters, three honest verdicts
 
-This repo ran two quantitative studies on public Binance data with the same
-harness and the same discipline. One found nothing and said so. The other found
-something real — and honestly reported that the clever part of it doesn't work.
+This repo ran three quantitative studies on public data with the same harness
+and the same discipline. One found nothing and said so. One found something
+real — and honestly reported that the clever part of it doesn't work. One
+checked our numbers against the live institutional implementation of the same
+trade — and found the interesting gap pointing the *other* way.
 
 | chapter | question | verdict | bottom line |
 |---|---|---|---|
 | ML on 1m order flow | can features of the last hour predict the next 5–60 min, net of costs? | **NO EDGE** | best config **−13.1 bps/bet** after costs |
 | Funding carry | is the perp funding stream harvestable, and does timing beat always-on? | **HARVEST YES, TIMING NO** | always-on **+11.9%/yr** net; best timing rule loses to it OOS |
+| Ethena vs our carry | does sUSDe earn what our measured funding predicts? | **STRUCTURE, NOT ALPHA** | realized **10.0%/yr** vs predicted 16.6–17.3; same regime, compressed amplitude |
 
-Both verdicts were produced by rules committed *before* the experiments ran.
-That's the actual subject of this document.
+All three verdicts were produced by rules committed *before* the numbers were
+computed. That's the actual subject of this document.
 
 ## The method
 
@@ -114,6 +117,59 @@ honest product of this chapter is a parameter-free strategy any spreadsheet
 could have found — plus the demonstration, with real numbers, of why everything
 smarter than it fails.
 
+## Chapter 3 — Ethena vs our carry: STRUCTURE, NOT ALPHA
+
+**Question.** sUSDe is the institutional implementation of exactly chapter 2's
+strategy — short perp, long collateral, harvest funding — and Ethena publishes
+what it actually paid stakers (DefiLlama archives it daily). Over the same
+window our measured BTC funding annualizes to 6.79% gross while sUSDe realized
+≈10%. Candidate explanations declared up front: (a) hotter hedges than BTC,
+(b) multi-exchange capture, (c) concentration — yield accrues on *all* of
+USDe's backing but is paid only to the staked share.
+
+**Method.** This chapter is an *attribution* study: nothing is tuned or fit,
+so there is no OOS split — what replaces the stop rule is a **closure rule**,
+committed before the numbers ran: measure candidates (a) and (c) — the two
+that free data can measure — report where realized APY falls against the
+prediction, and report the residual with its candidate owners instead of
+chasing it with more ingestion.
+
+**Data.** 866 joint days (2024-02-16 … 2026-06-30): daily sUSDe APY + staked
+TVL, USDe circulating supply, Binance BTC and ETH funding (8h → daily; every
+day in the window had exactly 3 settlements). Realized sUSDe: mean
+**10.04%/yr**, median 6.00 — the yield is regime-concentrated, not steady.
+
+**Results.**
+
+- **(a) Hedge choice is dead:** ETH funding 6.99%/yr gross vs BTC 6.79 —
+  **+0.20 pp**. On this window there is no "hotter hedge" story, and with
+  asset choice worth 0.2 pp, cross-venue spreads (b) are second-order too;
+  they were never ingested, per the closure rule.
+- **(c) Concentration dominates — and over-explains.** Staked share averaged
+  48.8% (range 13–73%), a **2.29×** multiplier on the stakers' rate. Applied
+  day by day it predicts 16.6 (BTC) – 17.3 (ETH) %/yr for a 100%-hedged
+  backing. Realized 10.04 sits **6.6 pp below the band's floor.**
+- So the teaser's question inverts. The puzzle was never "why does Ethena earn
+  more than raw funding" — counting the multiplier, it's "why do stakers get
+  *less* than levered funding". The answer is visible in the shape: the 7-day
+  correlation between sUSDe APY and the prediction is **+0.83** (same regime,
+  tightly tracked) but the amplitude is compressed *both ways* — 2024Q1
+  realized 32%/yr against a predicted 98; thin 2026Q1 realized 4.0 against a
+  predicted 0.1. A backing that is partly liquid stables (flat, T-bill-like
+  yield) plus a reserve fund acts as a damper: it caps the fat quarters and
+  floors the thin ones.
+- **Residual owners** (reported, not chased): the liquid-stables/LST share of
+  the backing, reserve-fund policy, the actual hedge mix, venue spreads.
+
+**What it means for chapter 2's trade.** Ethena's edge over a solo harvester
+is not a better hedge — it is the same funding stream, correlation +0.83 —
+it's *structure*: harvest on all backing, pay only stakers, smooth the regime.
+On the same window, running chapter 2's strategy yourself grossed ≈6.8%/yr;
+holding the product paid ≈10. The honest conclusion for a small account is
+almost embarrassing: the efficient way to hold this trade is to hold sUSDe —
+priced in a different currency, though: smart-contract, custody and depeg risk
+instead of exchange margin risk, and none of that is measured here.
+
 ## Why the same harness produced opposite verdicts
 
 Not because chapter 2's signal is stronger — funding's +1.09 bps/8h mean is
@@ -151,4 +207,6 @@ finding — reproducible from public data, end to end, by anyone:
 ```bash
 .venv/bin/python backfill.py --days 90 && .venv/bin/python model.py       # chapter 1
 .venv/bin/python backfill_futures.py 2020-01:2026-06 && .venv/bin/python carry_eval.py  # chapter 2
+.venv/bin/python backfill_futures.py 2024-02:2026-06 --symbol ETHUSDT --funding-only \
+  && .venv/bin/python backfill_ethena.py && .venv/bin/python ethena_eval.py  # chapter 3
 ```

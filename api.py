@@ -120,9 +120,14 @@ def funding(intervals: int = Query(default=90, ge=1, le=1000)) -> dict:
     Reads the OFFLINE carry backfill (funding + premium_index_1h), not the live
     stream — so this is "the funding regime lately", the visual companion to the
     carry study. `intervals` = how many 8h events to summarize (default 90 ≈ 30d).
-    Rates are returned in bps (fraction × 1e4)."""
-    rows = q(f"SELECT timestamp, rate FROM funding LIMIT -{intervals}")
-    basis = q("SELECT o FROM premium_index_1h LIMIT -1")
+    Rates are returned in bps (fraction × 1e4).
+
+    The symbol filter is load-bearing: the tables hold several symbols (the
+    Ethena chapter added ETHUSDT) whose 8h timestamps coincide, so an
+    unfiltered LIMIT -N interleaves them; the panel is the BTC carry study."""
+    rows = q("SELECT timestamp, rate FROM funding "
+             f"WHERE symbol = 'BTCUSDT' LIMIT -{intervals}")
+    basis = q("SELECT o FROM premium_index_1h WHERE symbol = 'BTCUSDT' LIMIT -1")
     if not rows:
         return {"latest_rate_bps": None, "latest_ts": None, "mean_rate_bps": None,
                 "pct_positive": None, "annualized_pct": None,

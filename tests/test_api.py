@@ -141,6 +141,22 @@ def test_funding_stats_and_series(monkeypatch):
     }
 
 
+def test_funding_queries_filter_symbol(monkeypatch):
+    # regression: the tables hold several symbols with COINCIDING 8h stamps
+    # (Ethena chapter added ETHUSDT), so an unfiltered LIMIT -N interleaves
+    # BTC and ETH rows — every /funding query must pin the study's symbol
+    seen: list[str] = []
+
+    def capture(sql: str) -> list[list]:
+        seen.append(sql)
+        return fake_q_funding(sql)
+
+    monkeypatch.setattr(api, "q", capture)
+    client.get("/funding")
+    assert len(seen) == 2
+    assert all("symbol = 'BTCUSDT'" in sql for sql in seen)
+
+
 def test_funding_intervals_bounds(monkeypatch):
     monkeypatch.setattr(api, "q", fake_q_funding)
     assert client.get("/funding", params={"intervals": 0}).status_code == 422

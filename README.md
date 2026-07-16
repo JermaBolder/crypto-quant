@@ -10,7 +10,7 @@ the finding — is written up in [docs/research.md](docs/research.md).
 
 ![order-flow terminal](docs/dashboard.png)
 
-Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓ · tests+CI ✓ · 6 carry ✓ (harvest yes, timing no) · 7 ops watchdog ✓**
+Roadmap: **0 data+DB ✓ · 1 streaming ✓ · 2 ML signals ✓ · 5 prod ✓ · ML v2 ✓ (closed: no edge) · 3 dashboard ✓ · tests+CI ✓ · 6 carry ✓ (harvest yes, timing no) · 7 ops watchdog ✓ · 8 ethena ✓ (structure, not alpha)**
 
 ## Architecture
 ```
@@ -73,6 +73,22 @@ terminal: recent 8h funding as a teal(+)/coral(−) bar sparkline + carry stats.
   carry exists; timing it doesn't.** Caveat: signal-quality proxy, not a
   backtest — margin, liquidation risk on the short leg, drawdowns ignored.
 
+## Ethena study (sUSDe vs our carry): STRUCTURE, NOT ALPHA
+- **Question**: sUSDe is the institutional version of the carry trade above and
+  publishes what it actually paid stakers. Our measured BTC funding grosses
+  6.79%/yr on the same 866-day window; sUSDe realized **10.04%/yr**. Why?
+- **Hedge choice is dead**: ETH funding 6.99 vs BTC 6.79 %/yr — +0.20 pp; no
+  "hotter hedge" story, so cross-venue spreads are second-order too.
+- **Concentration dominates — and over-explains**: yield accrues on all of
+  USDe's backing but pays only the staked ~48.8% → a 2.29× multiplier,
+  predicting 16.6–17.3 %/yr. Realized sits **6.6 pp below** the band: stakers
+  get a regime-compressed version of levered funding (corr +0.83, amplitude
+  damped both ways by the stables share + reserve fund).
+- Attribution study with a pre-committed **closure rule** (nothing tuned, no
+  chasing the residual with more ingestion). Practical closer: on this window
+  the efficient way to hold the carry was to hold the product — paying in
+  smart-contract/custody/depeg risk instead of exchange margin risk.
+
 ## Files
 | file | what |
 |---|---|
@@ -86,10 +102,11 @@ terminal: recent 8h funding as a teal(+)/coral(−) bar sparkline + carry stats.
 | `dataset.py` | 1m order-flow bars → 22 features + vol-scaled dead-zone label. |
 | `evaluate.py` | baselines-in-money harness + purged walk-forward splits. |
 | `model.py` | logreg + HistGradientBoosting, abstain-τ inside train, stop-rule verdict. |
-| `backfill_futures.py` | funding + premium-index dumps → QuestDB; idempotent per month. |
+| `backfill_futures.py` | funding + premium-index dumps → QuestDB; idempotent per (month, symbol). |
 | `carry.py` | 8h carry dataset: funding + basis MTM, fail-loud grid snap. |
 | `carry_eval.py` | episode-costed baselines + θ-rules OOS, stop-rule verdict. |
-| `backfill_ethena.py` | sUSDe realized yield (DefiLlama, free API) → QuestDB; complete days only. |
+| `backfill_ethena.py` | sUSDe realized yield + USDe supply (DefiLlama, free APIs) → QuestDB; complete days only. |
+| `ethena_eval.py` | attribution: realized sUSDe APY vs funding × staked-share multiplier, closure-rule verdict. |
 | `watchdog.py` | freshness watchdog → Telegram; hysteresis state machine, log-only w/o secrets. |
 | `api.py` | FastAPI over QuestDB: /health (freshness) /bars /stats /funding (carry). |
 | `dashboard/` | Next.js order-flow terminal: candles + delta, flow tape, live badge, funding panel. |
@@ -122,10 +139,14 @@ curl -sG http://localhost:9000/exec --data-urlencode \
 .venv/bin/python model.py                # models + verdict
 
 # carry study (funding/basis)
-.venv/bin/python backfill_futures.py 2020-01:2026-06  # idempotent per MONTH
+.venv/bin/python backfill_futures.py 2020-01:2026-06  # idempotent per (MONTH, SYMBOL)
 .venv/bin/python carry.py                # 8h dataset + descriptive stats
 .venv/bin/python carry_eval.py           # episode-costed baselines + verdict
-.venv/bin/python backfill_ethena.py      # sUSDe yield history (next-chapter data)
+
+# ethena study (chapter 3)
+.venv/bin/python backfill_futures.py 2024-02:2026-06 --symbol ETHUSDT --funding-only
+.venv/bin/python backfill_ethena.py      # sUSDe yield + USDe supply (incremental)
+.venv/bin/python ethena_eval.py          # attribution + closure-rule verdict
 
 # dashboard (two terminals)
 .venv/bin/uvicorn api:app --port 8000    # API over QuestDB

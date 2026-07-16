@@ -15,3 +15,6 @@ qdb-data/
 
 # macOS
 .DS_Store
+
+# Claude Code session worktrees
+.claude/
